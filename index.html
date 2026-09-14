@@ -30,9 +30,9 @@ main{padding:12px}
 .help{font-size:12px;color:#666;margin-bottom:8px;line-height:1.45}
 .gridbox{width:100%;height:min(62vh,560px);overflow:auto;background:#fff;border:1px solid #aaa;border-radius:8px;padding:6px;-webkit-overflow-scrolling:touch;scrollbar-width:auto}
 .grid{display:grid;gap:0;width:max-content;touch-action:none;user-select:none;-webkit-user-select:none;transform-origin:top left}
-.pan-controls{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}.pan-controls label{display:flex;align-items:center;gap:7px;flex:1;min-width:180px}.pan-controls input[type=range]{flex:1;min-width:0}.cell{border-right:1px solid #ddd;border-bottom:1px solid #ddd;background:#fff}
-.cell.lastcol{border-right-color:#999}
-.cell.lastrow{border-bottom-color:#999}
+.pan-controls{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}.pan-controls label{display:flex;align-items:center;gap:7px;flex:1;min-width:180px}.pan-controls input[type=range]{flex:1;min-width:0}.cell{border:1px solid #ddd;background:#fff;margin-left:-1px;margin-top:-1px}
+
+
 .empty{padding:30px;text-align:center;color:#888}
 </style>
 </head>
@@ -268,12 +268,10 @@ main{padding:12px}
     var dpi=300;
     var widthPx=Math.round(widthCm*dpi/2.54);
     var heightPx=Math.max(1,Math.round(widthPx*rows/cols));
-
     var canvas=document.createElement("canvas");
-    canvas.width=widthPx;
-    canvas.height=heightPx;
+    canvas.width=widthPx; canvas.height=heightPx;
     var ctx=canvas.getContext("2d");
-    if(!ctx){ alert("PNG를 만들 수 없는 브라우저야."); return; }
+    if(!ctx){alert("PNG를 만들 수 없는 브라우저야.");return;}
 
     ctx.fillStyle="#fff";
     ctx.fillRect(0,0,widthPx,heightPx);
@@ -281,31 +279,74 @@ main{padding:12px}
     var cw=widthPx/cols, ch=heightPx/rows;
     Array.prototype.forEach.call(grid.children,function(cell){
       ctx.fillStyle=getComputedStyle(cell).backgroundColor || "#fff";
-      ctx.fillRect(
-        parseInt(cell.dataset.c,10)*cw,
-        parseInt(cell.dataset.r,10)*ch,
-        Math.ceil(cw)+1,
-        Math.ceil(ch)+1
-      );
+      var x=parseInt(cell.dataset.c,10)*cw;
+      var y=parseInt(cell.dataset.r,10)*ch;
+      ctx.fillRect(Math.floor(x),Math.floor(y),Math.ceil(cw)+1,Math.ceil(ch)+1);
     });
 
-    var filename="weave-pattern-"+widthCm+"cm-"+cols+"x"+rows+".png";
-
-    // Use the synchronous download link first. This works on desktop and
-    // many mobile browsers without popup permission.
-    try{
-      var dataUrl=canvas.toDataURL("image/png");
-      var a=document.createElement("a");
-      a.href=dataUrl;
-      a.download=filename;
-      a.target="_blank";
-      a.rel="noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    }catch(err){
-      alert("PNG 저장에 실패했어. 브라우저에서 다시 눌러줘.");
+    // Draw the grid lines explicitly in the PNG, including the outer edges.
+    ctx.strokeStyle="#dddddd";
+    ctx.lineWidth=Math.max(1,Math.round(dpi/300));
+    ctx.beginPath();
+    for(var c=0;c<=cols;c++){
+      var x=Math.round(c*cw)+0.5;
+      ctx.moveTo(x,0); ctx.lineTo(x,heightPx);
     }
+    for(var r=0;r<=rows;r++){
+      var y=Math.round(r*ch)+0.5;
+      ctx.moveTo(0,y); ctx.lineTo(widthPx,y);
+    }
+    ctx.stroke();
+
+    // Stronger outer border.
+    ctx.strokeStyle="#999999";
+    ctx.lineWidth=2;
+    ctx.strokeRect(0,0,widthPx,heightPx);
+
+    var filename="weave-pattern-"+widthCm+"cm-"+cols+"x"+rows+".png";
+    var dataUrl=canvas.toDataURL("image/png");
+
+    // Reliable mobile fallback: show the actual PNG in an in-page viewer.
+    // Long-press saves it; Share sends the PNG when supported.
+    var old=document.getElementById("pngPreview");
+    if(old) old.remove();
+
+    var modal=document.createElement("div");
+    modal.id="pngPreview";
+    modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;";
+
+    var img=document.createElement("img");
+    img.src=dataUrl; img.alt="weaving pattern PNG";
+    img.style.cssText="max-width:100%;max-height:72vh;width:auto;height:auto;background:#fff;object-fit:contain;";
+
+    var note=document.createElement("div");
+    note.textContent="이미지를 길게 눌러 저장할 수 있어.";
+    note.style.cssText="color:#fff;font-size:13px;text-align:center;";
+
+    var buttons=document.createElement("div");
+    buttons.style.cssText="display:flex;gap:8px;justify-content:center;";
+
+    var share=document.createElement("button");
+    share.type="button"; share.textContent="이미지 공유";
+    share.style.cssText="height:38px;background:#fff;border:1px solid #aaa;border-radius:8px;padding:0 13px;font-size:13px;";
+    share.onclick=function(){
+      if(!navigator.share){alert("공유 기능이 지원되지 않아. 이미지를 길게 눌러 저장해줘.");return;}
+      fetch(dataUrl).then(function(r){return r.blob()}).then(function(blob){
+        var file=new File([blob],filename,{type:"image/png"});
+        if(navigator.canShare && navigator.canShare({files:[file]}))
+          return navigator.share({files:[file],title:"Weaving Pattern"});
+        return navigator.share({title:"Weaving Pattern"});
+      }).catch(function(){});
+    };
+
+    var close=document.createElement("button");
+    close.type="button"; close.textContent="닫기";
+    close.style.cssText="height:38px;background:#fff;border:1px solid #aaa;border-radius:8px;padding:0 13px;font-size:13px;";
+    close.onclick=function(){modal.remove();};
+
+    buttons.appendChild(share); buttons.appendChild(close);
+    modal.appendChild(img); modal.appendChild(note); modal.appendChild(buttons);
+    document.body.appendChild(modal);
   });
 
   updateRGB();
