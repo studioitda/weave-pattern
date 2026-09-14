@@ -47,6 +47,13 @@ main{padding:12px}
   </div>
 
   <div class="row">
+    <label>세로 칸 비율</label>
+    <button id="ratioDown" type="button" aria-label="세로 칸을 좁게">▼</button>
+    <span id="ratioValue" style="min-width:48px;text-align:center;font-size:12px">100%</span>
+    <button id="ratioUp" type="button" aria-label="세로 칸을 넓게">▲</button>
+  </div>
+
+  <div class="row">
     <label>PNG 가로폭 <input id="cm" type="number" min="1" max="200" step="0.1" value="20"> cm</label>
     <span style="font-size:11px;color:#777">저장할 때만 적용</span>
   </div>
@@ -90,11 +97,32 @@ main{padding:12px}
 
 <script>
 (function(){
-  var cols=80, rows=40, cellSize=14, selected="#000000", eraseMode=false, drawing=false;
+  var cols=80, rows=40, cellSize=14, verticalRatio=1, selected="#000000", eraseMode=false, drawing=false;
   var pinchStartDistance=0, pinchStartCellSize=14, zoomMin=2, zoomMax=60;
 
   var $=function(id){return document.getElementById(id)};
   var grid=$("grid"), palette=$("palette"), gridbox=$("gridbox"), panX=$("panX"), panY=$("panY");
+  var ratioValue=$("ratioValue"), ratioDown=$("ratioDown"), ratioUp=$("ratioUp");
+
+  function updateRatioLabel(){
+    ratioValue.textContent=Math.round(verticalRatio*100)+"%";
+  }
+
+  function applyVerticalRatio(){
+    grid.style.gridAutoRows=(cellSize*verticalRatio)+"px";
+    updateRatioLabel();
+    requestAnimationFrame(updatePanControls);
+  }
+
+  ratioDown.addEventListener("click",function(){
+    verticalRatio=Math.max(0.5,Math.round((verticalRatio-0.1)*10)/10);
+    applyVerticalRatio();
+  });
+
+  ratioUp.addEventListener("click",function(){
+    verticalRatio=Math.min(2,Math.round((verticalRatio+0.1)*10)/10);
+    applyVerticalRatio();
+  });
 
   function rgb(){
     return "rgb("+$("r").value+","+$("g").value+","+$("b").value+")";
@@ -174,7 +202,7 @@ main{padding:12px}
   function applyCellSize(nextSize){
     cellSize=Math.max(zoomMin,Math.min(zoomMax,nextSize));
     grid.style.gridTemplateColumns="repeat("+cols+","+cellSize+"px)";
-    grid.style.gridAutoRows=cellSize+"px";
+    grid.style.gridAutoRows=(cellSize*verticalRatio)+"px";
     requestAnimationFrame(updatePanControls);
   }
 
@@ -244,7 +272,7 @@ main{padding:12px}
 
     grid.innerHTML="";
     grid.style.gridTemplateColumns="repeat("+cols+","+cellSize+"px)";
-    grid.style.gridAutoRows=cellSize+"px";
+    grid.style.gridAutoRows=(cellSize*verticalRatio)+"px";
 
     var frag=document.createDocumentFragment();
     for(var r=0;r<rows;r++){
@@ -267,7 +295,7 @@ main{padding:12px}
     var widthCm=Math.max(1,parseFloat($("cm").value)||20);
     var dpi=300;
     var widthPx=Math.round(widthCm*dpi/2.54);
-    var heightPx=Math.max(1,Math.round(widthPx*rows/cols));
+    var heightPx=Math.max(1,Math.round(widthPx*rows/cols*verticalRatio));
     var canvas=document.createElement("canvas");
     canvas.width=widthPx; canvas.height=heightPx;
     var ctx=canvas.getContext("2d");
@@ -297,11 +325,6 @@ main{padding:12px}
       ctx.moveTo(0,y); ctx.lineTo(widthPx,y);
     }
     ctx.stroke();
-
-    // Stronger outer border.
-    ctx.strokeStyle="#999999";
-    ctx.lineWidth=2;
-    ctx.strokeRect(0,0,widthPx,heightPx);
 
     var filename="weave-pattern-"+widthCm+"cm-"+cols+"x"+rows+".png";
     var dataUrl=canvas.toDataURL("image/png");
