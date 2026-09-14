@@ -142,9 +142,8 @@ main{padding:12px}
     selected=color;
     eraseMode=false;
     $("erase").classList.remove("active");
-    Array.prototype.forEach.call(palette.children,function(x){x.style.outline=""});
-    button.style.outline="2px solid #222";
-    button.style.outlineOffset="2px";
+    Array.prototype.forEach.call(palette.children,function(x){x.style.boxShadow=""});
+    button.style.boxShadow="inset 0 0 0 2px #222";
   }
 
   function addColorButton(color){
@@ -159,7 +158,7 @@ main{padding:12px}
 
   ["#000000","#ffffff","#888888"].forEach(function(c,i){
     var b=addColorButton(c);
-    if(i===0){b.style.outline="2px solid #222";b.style.outlineOffset="2px"}
+    if(i===0){b.style.boxShadow="inset 0 0 0 2px #222"}
   });
 
   $("add").addEventListener("click",function(){
